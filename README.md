@@ -70,7 +70,7 @@ pip install -r requirements.txt
 
 1. Run the Python script:
    ```bash
-   python downloader.py
+   python main.py
    ```
 2. Paste your target YouTube URL when prompted.
 3. Provide a **Target Directory** (e.g., `downloads`, `~/Music/YouTube`, or leave it blank to save it right next to the script).
