@@ -50,6 +50,11 @@ def get_valid_bitrate():
             
         print("❌ Invalid input. Please enter a number between 1-5 or a valid numeric bitrate.")
 
+def sanitize_folder_name(name):
+    """Strips characters that are unsafe for folder/file names across OSes."""
+    name = re.sub(r'[\\/:*?"<>|]', '', name).strip()
+    return name or "Untitled Playlist"
+
 def clean_metadata_modifier(info_dict):
     """
     Extracted data hook: Parses out Artist and Title metadata.
@@ -77,15 +82,15 @@ def clean_metadata_modifier(info_dict):
     info_dict['title'] = title
     return info_dict
 
-def download_youtube_as_mp3(youtube_url, bitrate, output_dir):
-    # Uses the cleaned metadata tags directly to generate the "<artist> - <title>.<ext>" filename format
+def build_ydl_opts(bitrate, output_dir):
+    """Builds the shared yt-dlp options dict for a given bitrate/output folder."""
     output_template = os.path.join(output_dir, '%(artist)s - %(title)s.%(ext)s')
 
-    ydl_opts = {
+    return {
         'format': 'bestaudio/best',
         'outtmpl': output_template,
         'writethumbnail': False,
-        'modify_chapters': False, 
+        'modify_chapters': False,
         'postprocessors': [
             {
                 'key': 'FFmpegExtractAudio',
@@ -98,24 +103,73 @@ def download_youtube_as_mp3(youtube_url, bitrate, output_dir):
             }
         ],
         'quiet': False,
+        'ignoreerrors': True,
     }
 
+def download_single_video(ydl, info):
+    """Cleans metadata for one video's info dict and hands it to yt-dlp for processing."""
+    cleaned_info = clean_metadata_modifier(info)
+    ydl.process_info(cleaned_info)
+
+def download_playlist(ydl, info, bitrate, base_output_dir):
+    """
+    Iterates through every track in a playlist, downloading and tagging each one.
+    Creates a subfolder named after the playlist so tracks stay organized together.
+    """
+    entries = [e for e in info.get('entries', []) if e]  # Skip unavailable/private entries
+    total = len(entries)
+
+    if total == 0:
+        print("⚠️ No downloadable entries were found in this playlist.")
+        return
+
+    playlist_title = sanitize_folder_name(info.get('title') or "Untitled Playlist")
+    playlist_dir = os.path.join(base_output_dir, playlist_title)
+    os.makedirs(playlist_dir, exist_ok=True)
+
+    print(f"\n📃 Playlist detected: \"{playlist_title}\" ({total} track(s))")
+    print(f"📁 Saving tracks to: {playlist_dir}")
+
+    # Point this download session's output template at the playlist subfolder
+    ydl.params['outtmpl']['default'] = os.path.join(playlist_dir, '%(artist)s - %(title)s.%(ext)s')
+
+    success_count = 0
+    for index, entry in enumerate(entries, start=1):
+        entry_title = entry.get('title') or entry.get('id') or "Unknown"
+        print(f"\n[{index}/{total}] Processing: {entry_title}")
+        try:
+            download_single_video(ydl, entry)
+            success_count += 1
+        except Exception as e:
+            print(f"❌ Skipped \"{entry_title}\" due to an error: {e}")
+            continue
+
+    print(f"\n🎉 Playlist download complete! {success_count}/{total} track(s) saved to: {playlist_dir}")
+
+def download_youtube_as_mp3(youtube_url, bitrate, output_dir):
+    ydl_opts = build_ydl_opts(bitrate, output_dir)
+
     try:
-        print(f"\nExtracting audio and formatting metadata at {bitrate}kbps... Please wait.")
+        print(f"\nFetching metadata at {bitrate}kbps... Please wait.")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Fetch metadata details first
             info = ydl.extract_info(youtube_url, download=False)
-            # Filter and clean track metadata before the download pipeline runs
-            cleaned_info = clean_metadata_modifier(info)
-            # Submit modified data back into the downloader engine
-            ydl.process_info(cleaned_info)
-            
-        print(f"🎉 Download complete! Saved to: {output_dir}")
+
+            if info is None:
+                print("❌ Could not retrieve any information for that URL.")
+                return
+
+            if 'entries' in info:
+                # A playlist URL returns a top-level dict with an 'entries' list
+                download_playlist(ydl, info, bitrate, output_dir)
+            else:
+                print("Extracting audio and formatting metadata... Please wait.")
+                download_single_video(ydl, info)
+                print(f"🎉 Download complete! Saved to: {output_dir}")
     except Exception as e:
         print(f"❌ An error occurred: {e}")
 
 if __name__ == "__main__":
-    url = input("Enter YouTube Video URL: ").strip()
+    url = input("Enter YouTube Video or Playlist URL: ").strip()
     if url:
         output_folder = get_valid_directory()
         kbps = get_valid_bitrate()

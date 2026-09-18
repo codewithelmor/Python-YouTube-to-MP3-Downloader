@@ -1,9 +1,10 @@
 # YouTube to MP3 Downloader
 
-A simple, lightweight Python script to download audio from YouTube videos and automatically convert them into **MP3** files at your preferred quality using `yt-dlp` and `FFmpeg`.
+A simple, lightweight Python script to download audio from YouTube **videos or entire playlists** and automatically convert them into **MP3** files at your preferred quality using `yt-dlp` and `FFmpeg`.
 
 ## Features
 * **Smart Audio Conversion**: Downloads only the core audio stream to save bandwidth, converting directly into high-fidelity MP3 files.
+* **Playlist Support**: Paste a playlist URL (e.g. `https://www.youtube.com/playlist?list=...`) and the script automatically detects it, downloads every track, and organizes them into a subfolder named after the playlist. Unavailable/private tracks are skipped automatically, and one failed track won't stop the rest of the playlist.
 * **Standardized Filenames**: Automatically saves your songs in a clean, uniform file pattern: **`<artist> - <title>.mp3`**.
 * **Dynamic Bitrate Configuration**: Choose between 128, 192, 256, 320 kbps, or specific custom audio bitrate profiles.
 * **Target Output Folders**: Choose any folder path (creates missing folders automatically) or default straight to your current working workspace folder.
@@ -72,10 +73,13 @@ pip install -r requirements.txt
    ```bash
    python main.py
    ```
-2. Paste your target YouTube URL when prompted.
+2. Paste your target **YouTube video or playlist URL** when prompted. Both single-video links and playlist links (e.g. `https://www.youtube.com/playlist?list=OLAK5uy_kD_cajzJAuFc9OmcuFljLwkx5d875IGK4`) are supported.
 3. Provide a **Target Directory** (e.g., `downloads`, `~/Music/YouTube`, or leave it blank to save it right next to the script).
+   * For a single video, the MP3 is saved directly into this folder.
+   * For a playlist, a subfolder named after the playlist title is created inside this folder, and every track is saved there.
 4. Choose your desired **audio quality/bitrate** (e.g., 128, 192, 256, 320 kbps).
-5. The script downloads the stream, fixes duplicate metadata elements, writes clean ID3 tags, and outputs your final track matching the custom `<artist> - <title>.mp3` formatting rule.
+5. The script downloads the stream(s), fixes duplicate metadata elements, writes clean ID3 tags, and outputs the final track(s) matching the custom `<artist> - <title>.mp3` formatting rule.
+   * When a playlist URL is used, progress is printed per track (e.g. `[3/12] Processing: ...`), and any track that fails to download is skipped so the rest of the playlist still completes.
 
 ---
 
@@ -86,6 +90,7 @@ pip install -r requirements.txt
   ```bash
   pip install --upgrade yt-dlp
   ```
+* **Playlist Only Partially Downloads:** Some videos in a playlist may be private, deleted, or region-locked. These are skipped automatically and reported in the console; the rest of the playlist will still finish.
 
 ## Deactivation
 When you are done working on the project, you can exit the virtual environment by typing:
